@@ -2,6 +2,15 @@ set(CMAKE_MIN_VERSION   "3.5.0")
 set(LIBRAW_MIN_VERSION  "0.18")
 cmake_minimum_required(VERSION ${CMAKE_MIN_VERSION})
 
+if(NOT DEFINED CMAKE_DEBUG_POSTFIX) 
+    set(CMAKE_DEBUG_POSTFIX "d")
+endif()
+
+set(RC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/rawconverter/include/)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_COMPILER /usr/bin/clang++)
+
 project(librawsample)
 
 message(STATUS "----------------------------------------------------------------------------------")
