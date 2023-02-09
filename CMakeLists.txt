@@ -6,8 +6,6 @@ if(NOT DEFINED CMAKE_DEBUG_POSTFIX)
     set(CMAKE_DEBUG_POSTFIX "d")
 endif()
 
-set(RC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/rawconverter/include/)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 
