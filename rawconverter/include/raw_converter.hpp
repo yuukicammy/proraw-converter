@@ -40,12 +40,11 @@ public:
   static constexpr float black_offset = 0.055;
 
   RawConverter()
-      : gamma_curve(1 << 16, -1), xyzD65_to_sRGB{
-                                      {3.2404542, -1.5371385, -0.4985314},
-                                      {-0.9692660, 1.8760108, 0.0415560},
-                                      {0.0556434, -0.2040259, 1.0572252}} {};
-
-  RawConverter(const RawConverter &other) = default;
+      : gamma_curve(1 << 16, -1), sRGB_from_xyzD65{
+                                      {3.079955, -1.537139, -0.542816},
+                                      {-0.921259, 1.876011, 0.045247},
+                                      {0.052887, -0.204026, 1.151138}} {};
+  RawConverter(const RawConverter &other) = delete;
   RawConverter &operator=(const RawConverter &other) = delete;
   RawConverter(RawConverter &&other) = default;
   RawConverter &operator=(RawConverter &&other) = delete;
