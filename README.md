@@ -29,7 +29,7 @@ Usage:
 
   -r, --raw         Save the raw image
   -d, --debug       Enable debugging. Log file is output to ../logs/.
-  -t, --thresh arg  Threshold of histogram stretching in the range [0, 1] 
+  -t, --thresh arg  Persentage of histogram stretching in the range [0, 1] 
                     (-t 0.1 recommended). 
                     If this option is not specified, the brightness and 
                     contrast will not be adjusted. -t 0 means no brightness 
@@ -52,7 +52,7 @@ Done all conversion.
 ```
 
 ## Results
-|Threshold=0.00<br />(No Adjustment)|Threshold=0.04|Threshold=0.08|Threshold=0.10|Threshold=0.12|
+|-t 0.00|-t 0.04|-t 0.08|-t 0.10|-t 0.12|
 |---|---|---|---|---|
 |![Result image (threshold=0.00)](data/IMG_0008.DNG.cv_srgb_no_adj.png)|![Result image (threshold=0.04)](data/IMG_0008.DNG.cv_srgb_adj_0.040000.png)|![Result image (threshold=0.08)](data/IMG_0008.DNG.cv_srgb_adj_0.080000.png)|![Result image (threshold=0.10)](data/IMG_0008.DNG.cv_srgb_adj_0.100000.png)|![Result image (threshold=0.12)](data/IMG_0008.DNG.cv_srgb_adj_0.120000.png)|
 
