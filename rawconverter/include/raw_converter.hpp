@@ -183,17 +183,17 @@ public:
    * @brief Emphasize the brightness and contrast (histogram stretching).
    * Clip the input data to [0, USHRT_MAX] and create a histogram with
    * interval 8. Change the range of values so that [min-point, max-point] is
-   * [0, USHRT_MAX]. min_point and max-point are determined as the values at
-   * which the cumulative histogram is about stresh_thresh/2 from both ends.
+   * [0, USHRT_MAX]. min_point and max-point are determined to be top
+   * stretch_rate/2% and bottom stretch_rate/2%.
    * @tparam E The derived type of xtensor
    * @param e an image data stored in xtensor xexpression
-   * @param strech_thresh Thresholds of cumulative histograms that are the two
-   * ends of the re-rang.
+   * @param stretch_rate Percentage that defines the min and max thresholds
+   * (Range [0, 1])
    * @return
    */
   template <class E>
   auto adjust_brightness(const xt::xexpression<E> &e,
-                         const float strech_thresh = 0.4,
+                         const float strech_rate = 0.4,
                          const bool debug = false) noexcept {
     if (debug) {
       debug_message << "Start adjust_brightness()\n";
@@ -201,10 +201,10 @@ public:
     auto &src = e.derived_cast();
     auto &&image = xt::clip(src, 0, USHRT_MAX);
     float min_value = xt::amin(image)(), max_value = xt::amax(image)();
-    if (0.999999f <= strech_thresh) {
+    if (0.999999f <= strech_rate) {
       max_value = min_value;
-    } else if (0 < strech_thresh) {
-      int acc_thresh = image.shape()[1] * strech_thresh * 0.5f;
+    } else if (0 < strech_rate) {
+      int acc_thresh = image.shape()[1] * strech_rate * 0.5f;
       if (debug) {
         debug_message << "acc_thresh: " << acc_thresh << "\n";
       }
