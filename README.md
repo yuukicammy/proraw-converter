@@ -51,10 +51,10 @@ Done all conversion.
  -- Total run time (ms): 764.000000
 ```
 
-Result image (threshold=0.1)
-
-![Result image (threshold=0.1)](data/IMG_0008.DNG.cv_srgb_adj_0.100000.png)
-
+## Results
+|No Adjustment|Threshold=0.04|Threshold=0.08|Threshold=0.1|Threshold=0.12|
+|---|---|---|---|---|
+|![Result image (threshold=0)](data/IMG_0008.DNG.cv_srgb_no_adj.png)|![Result image (threshold=0.04)](data/IMG_0008.DNG.cv_srgb_adj_0.040000.png)|![Result image (threshold=0.08)](data/IMG_0008.DNG.cv_srgb_adj_0.080000.png)|![Result image (threshold=0.10)](data/IMG_0008.DNG.cv_srgb_adj_0.100000.png)|![Result image (threshold=0.12)](data/IMG_0008.DNG.cv_srgb_adj_0.120000.png)|
 
 ## License
 
