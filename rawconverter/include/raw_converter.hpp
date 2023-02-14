@@ -180,12 +180,11 @@ public:
   }
 
   /**
-   * @brief Emphasize the brightness and contrast if an image.
-   * Clips the input data to [0, USHRT_MAX] and creates a histogram with an
-   * interval of 8. Change the range of values so that [min-point, max-point] to
-   * [0, USHRT_MAX]. The min_point and max-point are determined as the value
-   * at which the cumulative histogram is about stresh_thresh/2 from both ends
-   * of each histogram.
+   * @brief Emphasize the brightness and contrast (histogram stretching).
+   * Clip the input data to [0, USHRT_MAX] and create a histogram with
+   * interval 8. Change the range of values so that [min-point, max-point] is
+   * [0, USHRT_MAX]. min_point and max-point are determined as the values at
+   * which the cumulative histogram is about stresh_thresh/2 from both ends.
    * @tparam E The derived type of xtensor
    * @param e an image data stored in xtensor xexpression
    * @param strech_thresh Thresholds of cumulative histograms that are the two
