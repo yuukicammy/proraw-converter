@@ -244,26 +244,8 @@ public:
   std::vector<int> gamma_curve;
 
   // CIE-XYZ to sRGB'
-  const xt::xtensor_fixed<float, xt::xshape<3, 3>> xyzD65_to_sRGB;
+  const xt::xtensor_fixed<float, xt::xshape<3, 3>> sRGB_from_xyzD65;
+
+  std::stringstream debug_message;
 };
-
-auto ToCvMat3b(const xt::xtensor<ushort, 2> &src, const std::size_t rows,
-               const std::size_t cols) noexcept {
-  cv::Mat dst(rows, cols, CV_8UC3);
-  for (int r = 0, i = 0; r < rows; r++) {
-    for (int c = 0; c < cols; c++, i++) {
-      auto &pixel = dst.at<cv::Vec3b>(r, c);
-      // B
-      pixel[0] = static_cast<uchar>(src(2, i) >> 8);
-
-      //  G
-      pixel[1] = static_cast<uchar>(src(1, i) >> 8);
-
-      //  R
-      pixel[2] = static_cast<uchar>(src(0, i) >> 8);
-    }
-  }
-  return dst;
-}
-
 } // namespace yk
