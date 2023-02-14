@@ -100,7 +100,11 @@ public:
     auto &&cam_from_xyz = xt::linalg::dot(analog_balance, color_matrix);
     auto sum = xt::sum(cam_from_xyz, {1});
     for (int i = 0; i < 3; i++) {
-      xt::view(cam_from_xyz, i, xt::all()) /= sum(i);
+      if (0.0000001 < sum(i)) {
+        xt::view(cam_from_xyz, i, xt::all()) /= sum(i);
+      } else {
+        xt::view(cam_from_xyz, i, xt::all()) = 0;
+      }
     }
     auto &&xyz_from_cam = xt::linalg::inv(cam_from_xyz);
     return xt::linalg::dot(xyz_from_cam, image);
