@@ -17,15 +17,26 @@ int main(int argc, char *argv[]) {
         "The program 1) converts a ProRaw image in sRGB' color space, 2) "
         "[optional] "
         "adjusts the brightness and contrasts, 3) applys gamma correction, and "
-        "then 4) saves the result in PNG format. ");
+        "then 4) saves the result in PNG format. \n"
+        "If you do not want to adjust brightness and contrast, do not specify "
+        "the -t option or specify -t 0.");
 
     options.add_options()("raw,r", "Save the raw image",
                           cxxopts::value<bool>())(
         "f,file", "ProRaw file path", cxxopts::value<std::string>())(
-        "d,debug", "Enable debugging",
-        cxxopts::value<bool>())("t,thresh", "Threshold of histogram stretching",
-                                cxxopts::value<float>()->default_value("0.04"))(
-        "a,adjust", "Adjust the brightness and contrast",
+        "d,debug", "Enable debugging. Log file is output to ../logs/.",
+        cxxopts::value<bool>())(
+        "t,thresh",
+        "Threshold of histogram stretching in the range [0, 1] (-t 0.1 "
+        "recommended). \nIf this "
+        "option is not specified, the brightness and contrast will not be "
+        "adjusted. -t 0 means no brightness "
+        "and "
+        "contrast adjustment, -t 1 "
+        "means "
+        "converting to a completely black image.",
+        cxxopts::value<float>()->default_value("0."))(
+        "m,measure", "Measure execution speed",
         cxxopts::value<bool>())("h,help", "Print usage");
     options.parse_positional({"file"});
     options.positional_help("ProRawFilePath");
@@ -40,8 +51,8 @@ int main(int argc, char *argv[]) {
     const std::string input_filename = args["file"].as<std::string>();
     const bool is_debug = args["debug"].as<bool>();
     const bool save_raw = args["raw"].as<bool>();
-    const bool apply_adjustment = args["adjust"].as<bool>();
-    const float threshold = apply_adjustment ? args["thresh"].as<float>() : 0.;
+    const bool measure_speed = args["measure"].as<bool>();
+    const float threshold = args["thresh"].as<float>();
 
     yk::log_init(is_debug, "myconversion-");
     BOOST_LOG_TRIVIAL(debug) << "Threshold: " << std::to_string(threshold);
@@ -136,13 +147,21 @@ int main(int argc, char *argv[]) {
           << "After cam-to-sRGB' image[:, " << image.shape()[1] / 2
           << "]: " << xt::view(srgb_, xt::all(), image.shape()[1] / 2);
 
-      BOOST_LOG_TRIVIAL(debug) << "Done conversion camera native color space "
-                                  "to CIE-XYZ color space. "
-                               << "Run time: " << std::to_string(elapsed);
+      BOOST_LOG_TRIVIAL(debug)
+          << "Done conversion from camera native color space "
+             "to sRGB'. "
+          << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done conversion from camera native color space "
+                     "to sRGB'. "
+                  << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
 
       BOOST_LOG_TRIVIAL(trace) << "Adjusting the brightness and contrast.";
-      if (!apply_adjustment) {
+      if (is_debug && threshold == 0.f) {
         BOOST_LOG_TRIVIAL(debug) << "adjust_brightness() is called, but "
                                     "the data is not stretched.";
       }
@@ -158,7 +177,12 @@ int main(int argc, char *argv[]) {
           << "After adjustment image[:, " << image.shape()[1] / 2
           << "]: " << xt::view(srgb_adj, xt::all(), image.shape()[1] / 2);
       BOOST_LOG_TRIVIAL(debug) << "Done adjusting the brightness and contrast. "
-                               << "Run time: " << std::to_string(elapsed);
+                               << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done adjusting the brightness and contrast." << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
 
       // Gamma Correction
@@ -169,27 +193,37 @@ int main(int argc, char *argv[]) {
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
               .count();
       BOOST_LOG_TRIVIAL(debug) << "Done gamma correction. "
-                               << "Run time: " << std::to_string(elapsed);
+                               << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done gamma correction." << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
       BOOST_LOG_TRIVIAL(trace)
           << "After gamma correction image[:, " << image.shape()[1] / 2
           << "]: " << xt::view(sRGB, xt::all(), image.shape()[1] / 2);
 
       BOOST_LOG_TRIVIAL(debug)
-          << "Done conversion from raw to sRGB with the brightness and "
+          << "Done conversion from ProRaw to sRGB with the brightness and "
              "contract adjustment. "
-          << "Total Run time: " << std::to_string(total_elapsed);
+          << "Total Run time (ms): " << std::to_string(total_elapsed);
+      if (measure_speed) {
+        std::cout << "Done all conversion." << std::endl;
+        std::cout << " -- Total run time (ms): "
+                  << std::to_string(total_elapsed) << std::endl;
+      }
       {
         BOOST_LOG_TRIVIAL(trace)
             << "Saving a conversion result through OpenCV.";
         cv::Mat &&rgb_image = yk::ToCvMat3b(sRGB, raw.imgdata.sizes.iheight,
                                             raw.imgdata.sizes.iwidth);
         std::stringstream ss;
-        if (apply_adjustment) {
-          ss << input_filename << ".cv_rgb_adj_" << std::to_string(threshold)
-             << ".png";
+        if (threshold == 0.f) {
+          ss << input_filename << ".cv_srgb_no_adj.png";
         } else {
-          ss << input_filename << ".cv_rgb_no_adj.png";
+          ss << input_filename << ".cv_srgb_adj_" << std::to_string(threshold)
+             << ".png";
         }
         cv::imwrite(ss.str(), rgb_image);
         BOOST_LOG_TRIVIAL(trace) << "Saved image: " << ss.str();
