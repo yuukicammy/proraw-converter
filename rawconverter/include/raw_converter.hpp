@@ -3,9 +3,6 @@
 #include <iostream>
 #include <libraw.h>
 #include <math.h>
-#include <memory>
-#include <opencv2/opencv.hpp>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <xtensor-blas/xlinalg.hpp>
