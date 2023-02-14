@@ -7,13 +7,14 @@ if(NOT DEFINED CMAKE_DEBUG_POSTFIX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_COMPILER /usr/bin/clang++)
+# set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 
-project(librawsample)
+project(rawconverter)
 
 message(STATUS "----------------------------------------------------------------------------------")
 message(STATUS "Starting CMake configuration for: ${PROJECT_NAME}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH} )
 
-add_subdirectory(rawconverter)
+add_subdirectory(experiments)
+add_subdirectory(test)
