@@ -118,8 +118,7 @@ public:
    */
   template <class E>
   auto xyz_to_sRGB(const xt::xexpression<E> &e) const noexcept {
-    auto &image = e.derived_cast();
-    return xt::linalg::dot(sRGB_from_xyzD65, image);
+    return xt::linalg::dot(sRGB_from_xyzD65, e);
   }
 
   /**
