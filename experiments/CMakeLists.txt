@@ -37,5 +37,11 @@ target_compile_definitions(xyz_adjustment PRIVATE ${LibRaw_DEFINITIONS})
 target_include_directories(xyz_adjustment PRIVATE ${LibRaw_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS} ${xtensor_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/rawconverter/include ${PROJECT_SOURCE_DIR}/third_party ${Boost_INCLUDE_DIR}) 
 target_link_libraries(xyz_adjustment PRIVATE xtensor xtensor-blas ${LibRaw_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES})  
 
+add_executable(effect_check effect_check.cpp)
+target_compile_definitions(effect_check PRIVATE ${LibRaw_DEFINITIONS})
+target_include_directories(effect_check PRIVATE ${LibRaw_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS} ${xtensor_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/rawconverter/include ${PROJECT_SOURCE_DIR}/third_party ${Boost_INCLUDE_DIR}) 
+target_link_libraries(effect_check PRIVATE xtensor xtensor-blas ${LibRaw_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES})  
+
+
 set(CMAKE_CXX_STANDARD 17)
 
