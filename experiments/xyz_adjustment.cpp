@@ -13,17 +13,33 @@
 int main(int argc, char *argv[]) {
   try {
     cxxopts::Options options(
-        "XYZ Adjustment", "The program adjusts the brightness and contrast of "
-                          "ProRaw files in the XYZ color system, then converts "
-                          "them to sRGB and saves them in PNG format.");
+        "ProRaw Converter using XYZ Adjustment",
+        "The program 1) converts a ProRaw image to CIE D65 XYZ color sysem, "
+        "2) "
+        "[optional] "
+        "adjusts the brightness and contrasts, 3) converts from XYZ to sRGB' "
+        "4) applys gamma correction, and "
+        "then 4) saves the result in PNG format. \n"
+        "If you do not want to adjust brightness and contrast, do not specify "
+        "the -t option or specify -t 0.");
 
     options.add_options()("raw,r", "Save the raw image",
                           cxxopts::value<bool>())(
         "f,file", "ProRaw file path", cxxopts::value<std::string>())(
-        "d,debug", "Enable debugging", cxxopts::value<bool>())(
-        "t,thresh", "Threshold of histogram stretching",
-        cxxopts::value<float>()->default_value("0.04"))("h,help",
-                                                        "Print usage");
+        "d,debug", "Enable debugging. Log file is output to ../logs/.",
+        cxxopts::value<bool>())(
+        "t,thresh",
+        "Threshold of histogram stretching in the range [0, 1] (-t 0.1 "
+        "recommended). \nIf this "
+        "option is not specified, the brightness and contrast will not be "
+        "adjusted. -t 0 means no brightness "
+        "and "
+        "contrast adjustment, -t 1 "
+        "means "
+        "converting to a completely black image.",
+        cxxopts::value<float>()->default_value("0."))(
+        "m,measure", "Measure execution speed",
+        cxxopts::value<bool>())("h,help", "Print usage");
     options.parse_positional({"file"});
     options.positional_help("ProRawFilePath");
 
@@ -37,6 +53,7 @@ int main(int argc, char *argv[]) {
     const std::string input_filename = args["file"].as<std::string>();
     const bool is_debug = args["debug"].as<bool>();
     const bool save_raw = args["raw"].as<bool>();
+    const bool measure_speed = args["measure"].as<bool>();
     const float threshold = args["thresh"].as<float>();
 
     yk::log_init(is_debug, "xyzadjustment-");
@@ -136,7 +153,14 @@ int main(int argc, char *argv[]) {
 
       BOOST_LOG_TRIVIAL(debug) << "Done conversion camera native color space "
                                   "to CIE-XYZ color space. "
-                               << "Run time: " << std::to_string(elapsed);
+                               << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done conversion camera native color space "
+                     "to CIE-XYZ color space. "
+                  << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
 
       BOOST_LOG_TRIVIAL(trace) << "Adjusting the brightness and contrast.";
@@ -152,7 +176,12 @@ int main(int argc, char *argv[]) {
           << "After adjustment image[:, " << image.shape()[1] / 2
           << "]: " << xt::view(xyz_adj, xt::all(), image.shape()[1] / 2);
       BOOST_LOG_TRIVIAL(debug) << "Done adjusting the brightness and contrast. "
-                               << "Run time: " << std::to_string(elapsed);
+                               << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done adjusting the brightness and contrast." << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
 
       BOOST_LOG_TRIVIAL(trace) << "Convert from CIE-XYZ color space to sRGB'. ";
@@ -168,7 +197,13 @@ int main(int argc, char *argv[]) {
           << "]: " << xt::view(srgb_, xt::all(), image.shape()[1] / 2);
       BOOST_LOG_TRIVIAL(debug)
           << "Done conversion from CIE-XYZ color space to sRGB'. "
-          << "Run time: " << std::to_string(elapsed);
+          << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done conversion from CIE-XYZ color space to sRGB'."
+                  << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
 
       // Gamma Correction
@@ -184,13 +219,23 @@ int main(int argc, char *argv[]) {
           << "After gamma correction image[:, " << image.shape()[1] / 2
           << "]: " << xt::view(srgb, xt::all(), image.shape()[1] / 2);
       BOOST_LOG_TRIVIAL(debug) << "Done gamma correction. "
-                               << "Run time: " << std::to_string(elapsed);
+                               << "Run time (ms): " << std::to_string(elapsed);
+      if (measure_speed) {
+        std::cout << "Done gamma correction." << std::endl;
+        std::cout << " -- Run time (ms): " << std::to_string(elapsed)
+                  << std::endl;
+      }
       total_elapsed += elapsed;
 
       BOOST_LOG_TRIVIAL(debug)
           << "Done conversion from raw to sRGB with the brightness and "
              "contract adjustment. "
-          << "Total Run time: " << std::to_string(total_elapsed);
+          << "Total Run time (ms): " << std::to_string(total_elapsed);
+      if (measure_speed) {
+        std::cout << "Done all conversion." << std::endl;
+        std::cout << " -- Total run time (ms): "
+                  << std::to_string(total_elapsed) << std::endl;
+      }
       {
         BOOST_LOG_TRIVIAL(trace)
             << "Saving a conversion result through OpenCV.";
