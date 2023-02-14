@@ -158,13 +158,13 @@ public:
 
     for (int ch = 0; ch < 3; ch++) {
       for (int i = 0; i < image.shape()[1]; i++) {
-        const ushort src_val =
+        const int src_val =
             std::min<int>(USHRT_MAX, std::max<int>(0, image(ch, i)));
         if (0 <= gamma_curve[src_val]) {
           image(ch, i) = static_cast<ushort>(gamma_curve[src_val]);
         } else if (image(ch, i) < thresh) {
-          gamma_curve[src_val] = static_cast<int>(std::max<float>(
-              0, std::min<float>(USHRT_MAX, image(ch, i) * linear_coeff)));
+          gamma_curve[src_val] = std::max<int>(
+              0, std::min<int>(USHRT_MAX, image(ch, i) * linear_coeff));
           image(ch, i) = static_cast<ushort>(gamma_curve[src_val]);
         } else {
           float value = static_cast<float>(src_val) / max_value;
