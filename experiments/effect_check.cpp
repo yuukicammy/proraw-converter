@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
         "d,debug", "Enable debugging. Log file is output to ../logs/.",
         cxxopts::value<bool>())(
         "t,thresh",
-        "Threshold of histogram stretching in the range [0, 1] (-t 0.1 "
+        "Persentage of histogram stretching in the range [0, 1] (-t 0.1 "
         "recommended). \nIf this "
         "option is not specified, the brightness and contrast will not be "
         "adjusted. -t 0 means no brightness "
