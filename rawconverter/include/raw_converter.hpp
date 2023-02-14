@@ -94,8 +94,7 @@ public:
         color_matrix(i, j) = cm[i][j];
       }
     }
-    xt::xtensor<float, 2> analog_balance =
-        xt::diag(xt::xarray<float>{ab[0], ab[1], ab[2]});
+    auto &&analog_balance = xt::diag(xt::xarray<float>{ab[0], ab[1], ab[2]});
     //   Matrix to convert from camera native color space to XYZ color
     //   space.
     auto &&cam_from_xyz = xt::linalg::dot(analog_balance, color_matrix);
