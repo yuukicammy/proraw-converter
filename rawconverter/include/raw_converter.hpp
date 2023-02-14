@@ -93,17 +93,17 @@ public:
         color_matrix(i, j) = cm[i][j];
       }
     }
-    xt::xtensor<float, 2> analog_balance = xt::zeros<float>({3, 3});
+    xt::xtensor<float, 2> analog_balance =
+        xt::diag(xt::xarray<float>{ab[0], ab[1], ab[2]});
+    //   Matrix to convert from camera native color space to XYZ color
+    //   space.
+    auto &&cam_from_xyz = xt::linalg::dot(analog_balance, color_matrix);
+    auto sum = xt::sum(cam_from_xyz, {1});
     for (int i = 0; i < 3; i++) {
-      analog_balance(i, i) = ab[i];
+      xt::view(cam_from_xyz, i, xt::all()) /= sum(i);
     }
-
-    auto &&xyz_to_cam = xt::linalg::dot(analog_balance, color_matrix);
-
-    // Matrix to convert from camera native color space to XYZ color
-    // space.
-    auto &&cam_to_xyz = xt::linalg::inv(xyz_to_cam);
-    return xt::linalg::dot(cam_to_xyz, image);
+    auto &&xyz_from_cam = xt::linalg::inv(cam_from_xyz);
+    return xt::linalg::dot(xyz_from_cam, image);
   }
 
   /**
@@ -115,7 +115,7 @@ public:
   template <class E>
   auto xyz_to_sRGB(const xt::xexpression<E> &e) const noexcept {
     auto &image = e.derived_cast();
-    return xt::linalg::dot(xyzD65_to_sRGB, image);
+    return xt::linalg::dot(sRGB_from_xyzD65, image);
   }
 
   /**
@@ -147,17 +147,16 @@ public:
    * @return
    */
   template <class E>
-  auto gamma_correction(const xt::xexpression<E> &&e) noexcept {
+  auto gamma_correction(const xt::xexpression<E> &e) noexcept {
     auto &src = e.derived_cast();
-    auto max_value = xt::amax(src)();
-    xt::xtensor<ushort, 2> image =
-        xt::where(src < 0, 0, xt::where(USHRT_MAX < src, USHRT_MAX, src));
-    ushort thresh = static_cast<ushort>(std::max<float>(
-        0.f, std::min<float>(USHRT_MAX, linear_thresh_coeff * max_value)));
+    auto image = src;
+    constexpr float max_value = USHRT_MAX;
+    constexpr ushort thresh = linear_thresh_coeff * max_value;
 
     for (int ch = 0; ch < 3; ch++) {
       for (int i = 0; i < image.shape()[1]; i++) {
-        const ushort src_val = image(ch, i);
+        const ushort src_val =
+            std::min<int>(USHRT_MAX, std::max<int>(0, image(ch, i)));
         if (0 <= gamma_curve[src_val]) {
           image(ch, i) = static_cast<ushort>(gamma_curve[src_val]);
         } else if (image(ch, i) < thresh) {
@@ -165,12 +164,11 @@ public:
               0, std::min<float>(USHRT_MAX, image(ch, i) * linear_coeff)));
           image(ch, i) = static_cast<ushort>(gamma_curve[src_val]);
         } else {
-          float value = src_val / max_value;
+          float value = static_cast<float>(src_val) / max_value;
           value = (std::pow(value, 1. / gmm) * 1.055) - black_offset;
-          value =
-              std::max(0.f, std::min(1.f, std::max(0.f, value)) * max_value);
-          gamma_curve[src_val] = static_cast<int>(
-              std::max<int>(0, std::min<int>(USHRT_MAX, value)));
+          value *= max_value;
+          gamma_curve[src_val] =
+              std::max<int>(0, std::min<int>(USHRT_MAX, value));
           image(ch, i) = static_cast<ushort>(gamma_curve[src_val]);
         }
       }
@@ -179,29 +177,36 @@ public:
   }
 
   /**
-   * @brief
-   * @tparam E
-   * @param e
-   * @param trunc_thresh
+   * @brief Emphasize the brightness and contrast if an image.
+   * Clips the input data to [0, USHRT_MAX] and creates a histogram with an
+   * interval of 8. Change the range of values so that [min-point, max-point] to
+   * [0, USHRT_MAX]. The min_point and max-point are determined as the value
+   * at which the cumulative histogram is about stresh_thresh/2 from both ends
+   * of each histogram.
+   * @tparam E The derived type of xtensor
+   * @param e an image data stored in xtensor xexpression
+   * @param strech_thresh Thresholds of cumulative histograms that are the two
+   * ends of the re-rang.
    * @return
    */
   template <class E>
-  auto ajust_brightness(const xt::xexpression<E> &e,
-                        const float trunc_thresh = 0.0) const {
+  auto adjust_brightness(const xt::xexpression<E> &e,
+                         const float strech_thresh = 0.4,
+                         const bool debug = false) noexcept {
+    if (debug) {
+      debug_message << "Start adjust_brightness()\n";
+    }
     auto &src = e.derived_cast();
-    auto &&image =
-        xt::where(src < 0, 0, xt::where(USHRT_MAX < src, USHRT_MAX, src));
-
-    int min_value = xt::amin(image)(), max_value = xt::amax(image)();
-    if (trunc_thresh < 1.f / image.shape()[1] || 0.5 < trunc_thresh) {
-      std::cerr << "wrong parameter is set in RawConverter::trunc_thresh(). "
-                   "trunc_thresh: "
-                << std::to_string(trunc_thresh) << std::endl;
-      std::cerr << "RawConverter::trunc_thresh() will not change any values."
-                << std::endl;
-    } else {
-      int acc_thresh = image.shape()[1] * trunc_thresh;
-      std::vector<int> histogram(1 << 13, 0);
+    auto &&image = xt::clip(src, 0, USHRT_MAX);
+    float min_value = xt::amin(image)(), max_value = xt::amax(image)();
+    if (0.999999f <= strech_thresh) {
+      max_value = min_value;
+    } else if (0 < strech_thresh) {
+      int acc_thresh = image.shape()[1] * strech_thresh * 0.5f;
+      if (debug) {
+        debug_message << "acc_thresh: " << acc_thresh << "\n";
+      }
+      std::vector<long long> histogram(1 << 13, 0);
       for (int i = 0; i < image.shape()[1]; i++) {
         histogram[static_cast<ushort>(image(1, i)) >> 3]++;
       }
@@ -213,9 +218,10 @@ public:
           acc += histogram[bin];
           bin++;
         }
-        if (0 < bin) {
-          min_value = (bin << 3) - 1;
+        if (debug) {
+          debug_message << "min bin: " << bin << "\n";
         }
+        min_value = (bin << 3);
       }
       // calculate the maximum value in the scope.
       {
@@ -225,16 +231,33 @@ public:
           acc += histogram[bin];
           bin--;
         }
-        if (bin < histogram.size() - 1) {
-          max_value = ((bin + 1) << 3);
+        if (debug) {
+          debug_message << "max bin: " << bin << "\n";
         }
+        max_value = (bin << 3);
       }
     }
     // scaling: min_value -> 0, max_value -> USHRT_MAX
-    const float alpha = USHRT_MAX / (max_value - min_value);
+    if (debug) {
+      debug_message << "max value: " << max_value << "\n";
+      debug_message << "min value: " << min_value << "\n";
+    }
+    const float alpha =
+        (max_value - min_value) < 0.00001
+            ? 0
+            : static_cast<float>(USHRT_MAX) / (max_value - min_value);
     const float beta = -min_value * alpha;
+    if (debug) {
+      debug_message << "alpha: " << std::to_string(alpha) << "\n";
+      debug_message << "beta: " << std::to_string(beta) << "\n";
+    }
     // calculate image * alpha + beta
-    return xt::eval(xt::fma(image, alpha, beta));
+    auto &&res = xt::eval(image * alpha +
+                          beta); // xt::eval(xt::fma(image, alpha, beta));
+    if (debug) {
+      debug_message << "End adjust_brightness()\n";
+    }
+    return res;
   }
 
   // Cache gamma correction values
