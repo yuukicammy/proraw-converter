@@ -7,9 +7,8 @@ if(NOT DEFINED CMAKE_DEBUG_POSTFIX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
-# set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 
-project(rawconverter)
+project(ProRawConverter)
 
 message(STATUS "----------------------------------------------------------------------------------")
 message(STATUS "Starting CMake configuration for: ${PROJECT_NAME}")
