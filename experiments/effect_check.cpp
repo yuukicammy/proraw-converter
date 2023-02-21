@@ -173,12 +173,8 @@ int main(int argc, char *argv[]) {
         result = xt::cast<ushort>(xt::clip(srgb_, 0, USHRT_MAX));
       }
 
-      {
+      if (is_debug && threshold != 0.f) {
         BOOST_LOG_TRIVIAL(trace) << "Adjusting the brightness and contrast.";
-        if (is_debug && threshold == 0.f) {
-          BOOST_LOG_TRIVIAL(debug) << "adjust_brightness() is called, but "
-                                      "the data is not stretched.";
-        }
         auto start = std::chrono::system_clock::now();
         auto &&srgb_adj = rc.adjust_brightness(result, threshold, is_debug);
         auto end = std::chrono::system_clock::now();
@@ -202,6 +198,7 @@ int main(int argc, char *argv[]) {
         total_elapsed += elapsed;
         result = xt::cast<ushort>(xt::clip(srgb_adj, 0, USHRT_MAX));
       }
+
       if (apply_gamma_correction) {
         // Gamma Correction
         auto start = std::chrono::system_clock::now();
