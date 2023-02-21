@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
       }
       {
         std::stringstream ss;
-        ss << argv[1] << ".libraw_rgb_default.TIFF";
+        ss << input_filename << ".libraw_rgb_default.TIFF";
         auto &&start = std::chrono::system_clock::now();
         int ret = raw.dcraw_ppm_tiff_writer(ss.str().c_str());
         if (ret != LIBRAW_SUCCESS) {
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
         }
       }
       std::stringstream ss;
-      ss << argv[1] << ".libraw_to_opencv.png";
+      ss << input_filename << ".libraw_to_opencv.png";
       cv::imwrite(ss.str(), cv_libraw_image);
       BOOST_LOG_TRIVIAL(trace) << "Saved image: " << ss.str();
     }
@@ -130,9 +130,10 @@ int main(int argc, char *argv[]) {
       raw.imgdata.params.output_bps = 8;
       raw.imgdata.params.output_tiff = 1;
       raw.imgdata.params.user_flip = 0;
-      raw.imgdata.params.no_auto_bright = 0; // VERY IMPORTANT
+      raw.imgdata.params.no_auto_bright = 1; // VERY IMPORTANT
       raw.imgdata.params.half_size = 0;
       raw.imgdata.params.use_auto_wb = 0;
+      raw.imgdata.params.no_auto_scale = 1;
       raw.imgdata.params.use_camera_wb = 1;
       raw.imgdata.params.use_camera_matrix = 1;
 
@@ -169,7 +170,7 @@ int main(int argc, char *argv[]) {
       }
       {
         std::stringstream ss;
-        ss << argv[1] << ".libraw_rgb.TIFF";
+        ss << input_filename << ".libraw_rgb.TIFF";
         auto &&start = std::chrono::system_clock::now();
         int ret = raw.dcraw_ppm_tiff_writer(ss.str().c_str());
         if (ret != LIBRAW_SUCCESS) {
