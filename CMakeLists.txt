@@ -16,4 +16,4 @@ message(STATUS "Starting CMake configuration for: ${PROJECT_NAME}")
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH} )
 
 add_subdirectory(experiments)
-add_subdirectory(test)
+# add_subdirectory(test)

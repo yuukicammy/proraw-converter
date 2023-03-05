@@ -7,10 +7,34 @@
 #include <string>
 #include <vector>
 // #include <netinet/in.h>
-#include "experiment_common.hpp"
-#include "raw_converter.hpp"
 #include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <libraw.h>
 #include <stdexcept>
+
+namespace yk {
+// Set up logger
+static void log_init(const bool is_debug, const std::string file_prefix = "") {
+  if (is_debug) {
+    boost::log::core::get()->set_filter(boost::log::trivial::severity >=
+                                        boost::log::trivial::trace);
+  } else {
+    boost::log::core::get()->set_filter(boost::log::trivial::severity >=
+                                        boost::log::trivial::info);
+  }
+  static const std::string logdir{"../logs"};
+  // if (!std::filesystem::exists(logdir)) {
+  //   std::filesystem::create_directory(logdir);
+  // }
+  boost::log::add_file_log(
+      boost::log::keywords::file_name =
+          logdir + "/" + file_prefix + "%Y-%m-%d-%H-%M-%S.txt",
+      boost::log::keywords::format =
+          "[%TimeStamp%] [%ThreadID%] [%Severity%] %Message%");
+  boost::log::add_common_attributes();
+}
+} // namespace yk
 
 int main(int argc, char *argv[]) {
   try {
@@ -127,7 +151,7 @@ int main(int argc, char *argv[]) {
       std::stringstream ss;
       ss << raw_paths[id] << ".libraw.TIFF";
       // raw.dcraw_ppm_tiff_writer(ss.str().c_str());
-      cv::imwrite(ss.str(), raw_img);
+      // cv::imwrite(ss.str(), raw_img);
 
       it++;
     }
