@@ -44,7 +44,7 @@ std::string basename(const std::string &path) {
 
 int main(int argc, char *argv[]) {
   try {
-    int n_first_skip = 4627;
+    int n_first_skip = 1692 + 130 + 13;
     const std::string input_filename = argv[1];
 
     yk::log_init(true, "save_prophoto16-");
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
     // Open a ProRaw file.
     int skip_cnt = 0;
     auto it = indices.begin();
-    while (0 <= n_first_skip) {
+    while (0 < n_first_skip) {
       n_first_skip--;
       it++;
     }
@@ -127,38 +127,17 @@ int main(int argc, char *argv[]) {
       // Initial processing
       raw.unpack();
 
-      unsigned mask = 0;
-      int mask_id = 0;
-      if (0 < raw.imgdata.sizes.raw_inset_crops[0].cleft) {
-        mask = 1;
-        mask_id = 0;
-      } else {
-        mask = 3;
-        mask_id = 1;
+      raw.adjust_to_raw_inset_crop(1, 0.1f);
+
+      ushort image_width = raw.imgdata.sizes.width;
+      ushort image_height = raw.imgdata.sizes.height;
+
+      if (4 < raw.imgdata.sizes.flip) {
+        std::swap(image_width, image_height);
       }
 
-      int expected_width = raw.imgdata.sizes.raw_inset_crops[mask_id].cwidth;
-      int expected_height = raw.imgdata.sizes.raw_inset_crops[mask_id].cheight;
-
-      if ((expected_width < target_width &&
-           (target_width - expected_width) < 2) ||
-          (expected_width < target_height &&
-           (target_height - expected_width) < 2)) {
-        raw.imgdata.sizes.raw_inset_crops[mask_id].cleft--;
-        raw.imgdata.sizes.raw_inset_crops[mask_id].cwidth++;
-      }
-      if ((expected_height < target_height &&
-           (target_height - expected_height) < 2) ||
-          (expected_height < target_width &&
-           (target_width - expected_height) < 2)) {
-        raw.imgdata.sizes.raw_inset_crops[mask_id].ctop--;
-        raw.imgdata.sizes.raw_inset_crops[mask_id].cheight++;
-      }
-      raw.adjust_to_raw_inset_crop(mask, 0.1f);
-
-      if ((raw.imgdata.sizes.width != target_width ||
-           raw.imgdata.sizes.height != target_height) &&
-          raw.imgdata.sizes.flip < 5) {
+      if (1 < std::abs(image_width - target_width) ||
+          1 < std::abs(image_height - target_height)) {
         BOOST_LOG_TRIVIAL(info) << skip_cnt << " Skip " << raw_paths[id];
         BOOST_LOG_TRIVIAL(info) << " raw size: (" << raw.imgdata.sizes.height
                                 << ", " << raw.imgdata.sizes.width << ")";
@@ -179,7 +158,8 @@ int main(int argc, char *argv[]) {
             "libraw_linear_prophoto16/"
          << fileid << ".TIFF";
       raw.dcraw_ppm_tiff_writer(ss.str().c_str());
-      BOOST_LOG_TRIVIAL(info) << " Saved: " << ss.str();
+      BOOST_LOG_TRIVIAL(info)
+	<< std::distance(indices.begin(), it) << " Saved: " << ss.str();
       it++;
     }
     return 0;
