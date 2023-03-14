@@ -34,11 +34,17 @@ static void log_init(const bool is_debug, const std::string file_prefix = "") {
           "[%TimeStamp%] [%ThreadID%] [%Severity%] %Message%");
   boost::log::add_common_attributes();
 }
+
+std::string basename(const std::string &path) {
+  auto str = path.substr(path.find_last_of('/') + 1);
+  return str.substr(0, str.find_last_of('.'));
+}
+
 } // namespace yk
 
 int main(int argc, char *argv[]) {
   try {
-
+    int n_first_skip = 4627;
     const std::string input_filename = argv[1];
 
     yk::log_init(true, "save_prophoto16-");
@@ -92,33 +98,34 @@ int main(int argc, char *argv[]) {
     }
 
     // Open a ProRaw file.
+    int skip_cnt = 0;
     auto it = indices.begin();
+    while (0 <= n_first_skip) {
+      n_first_skip--;
+      it++;
+    }
     while (it != indices.end()) {
       auto id = *it;
       cv::Mat target = cv::imread(expert_paths[id]);
       const int target_height = target.rows;
       const int target_width = target.cols;
       target.release();
-
-      BOOST_LOG_TRIVIAL(info) << "Expert image size: (" << target_height << ", "
-                              << target_width << ")";
-
-      int res = raw.open_file(raw_paths[id].c_str());
-      // auto target = cv::imread(expert_paths[i]);
-      if (res == LIBRAW_SUCCESS) {
-        BOOST_LOG_TRIVIAL(info) << "LibRaw successfully reads the raw file."
-                                << "Filename: " << raw_paths[id];
-      } else {
-        throw std::runtime_error("LibRaw failed to read file: " +
-                                 raw_paths[id]);
+      int retry = 3;
+      while (0 <= retry) {
+        int res = raw.open_file(raw_paths[id].c_str());
+        if (res != LIBRAW_SUCCESS) {
+          if (retry == 0) {
+            throw std::runtime_error("LibRaw failed to read file: " +
+                                     raw_paths[id]);
+          } else {
+            retry--;
+          }
+        } else {
+          break;
+        }
       }
-
       // Initial processing
       raw.unpack();
-
-      BOOST_LOG_TRIVIAL(info)
-          << "RAW Original image size: (" << raw.imgdata.sizes.height << ", "
-          << raw.imgdata.sizes.width << ")";
 
       unsigned mask = 0;
       int mask_id = 0;
@@ -133,26 +140,46 @@ int main(int argc, char *argv[]) {
       int expected_width = raw.imgdata.sizes.raw_inset_crops[mask_id].cwidth;
       int expected_height = raw.imgdata.sizes.raw_inset_crops[mask_id].cheight;
 
-      if (expected_width < target_width &&
-          (target_width - expected_width) < 2) {
+      if ((expected_width < target_width &&
+           (target_width - expected_width) < 2) ||
+          (expected_width < target_height &&
+           (target_height - expected_width) < 2)) {
         raw.imgdata.sizes.raw_inset_crops[mask_id].cleft--;
         raw.imgdata.sizes.raw_inset_crops[mask_id].cwidth++;
       }
-      if (expected_height < target_height &&
-          (target_height - expected_height) < 2) {
+      if ((expected_height < target_height &&
+           (target_height - expected_height) < 2) ||
+          (expected_height < target_width &&
+           (target_width - expected_height) < 2)) {
         raw.imgdata.sizes.raw_inset_crops[mask_id].ctop--;
         raw.imgdata.sizes.raw_inset_crops[mask_id].cheight++;
       }
       raw.adjust_to_raw_inset_crop(mask, 0.1f);
 
-      raw.dcraw_process();
-      BOOST_LOG_TRIVIAL(info) << "RAW image size: (" << raw.imgdata.sizes.height
-                              << ", " << raw.imgdata.sizes.width << ")";
-      std::stringstream ss;
-      ss << raw_paths[id] << ".libraw.TIFF";
-      // raw.dcraw_ppm_tiff_writer(ss.str().c_str());
-      // cv::imwrite(ss.str(), raw_img);
+      if ((raw.imgdata.sizes.width != target_width ||
+           raw.imgdata.sizes.height != target_height) &&
+          raw.imgdata.sizes.flip < 5) {
+        BOOST_LOG_TRIVIAL(info) << skip_cnt << " Skip " << raw_paths[id];
+        BOOST_LOG_TRIVIAL(info) << " raw size: (" << raw.imgdata.sizes.height
+                                << ", " << raw.imgdata.sizes.width << ")";
+        BOOST_LOG_TRIVIAL(info) << " target size: (" << target_height << ", "
+                                << target_width << ")";
+        BOOST_LOG_TRIVIAL(info) << "";
+        skip_cnt++;
+        it++;
+        continue;
+      }
 
+      raw.dcraw_process();
+
+      std::string fileid = yk::basename(raw_paths[id]);
+
+      std::stringstream ss;
+      ss << "/mnt/disks/data/MITAboveFiveK/processed/"
+            "libraw_linear_prophoto16/"
+         << fileid << ".TIFF";
+      raw.dcraw_ppm_tiff_writer(ss.str().c_str());
+      BOOST_LOG_TRIVIAL(info) << " Saved: " << ss.str();
       it++;
     }
     return 0;
