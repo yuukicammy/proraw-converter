@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <execution>
 #include <iostream>
 #include <libraw.h>
 #include <math.h>
@@ -152,7 +153,7 @@ public:
   template <class E>
   auto gamma_correction(const xt::xexpression<E> &e) noexcept {
     auto &src = e.derived_cast();
-    auto image = src;
+    auto image = xt::eval(src);
     constexpr float max_value = USHRT_MAX;
     constexpr ushort thresh = linear_thresh_coeff * max_value;
 
@@ -179,6 +180,241 @@ public:
     return image;
   }
 
+  template <class E>
+  void raw_adjust(xt::xexpression<E> &e,
+                  const float scale = 1.) const noexcept {
+    auto &src = e.derived_cast();
+    int n = src.shape()[1];
+    for (int i = 0; i < src.shape()[1]; i++) {
+      src(0, i) = std::clamp<int>(src(0, i) << 3, 0, USHRT_MAX);
+      src(1, i) = std::clamp<int>(src(1, i) << 3, 0, USHRT_MAX);
+      src(2, i) = std::clamp<int>(src(2, i) << 3, 0, USHRT_MAX);
+    }
+  }
+
+  template <class E>
+  auto adjust_brightness_6(const xt::xexpression<E> &e,
+                           const bool debug = false) const noexcept {
+    auto &src = e.derived_cast();
+    auto minv = xt::amin(src);
+    auto maxv = xt::amax(src);
+    float scale =
+        1. / std::clamp<float>(maxv() - minv(), 0.00000001, USHRT_MAX);
+    return (src - minv) * scale;
+  }
+
+  template <class E>
+  auto adjust_brightness_5(const xt::xexpression<E> &e,
+                           const float stddev_rate = 0.96,
+                           const bool debug = false) noexcept {
+    auto &src = e.derived_cast();
+    int n = src.shape()[1];
+
+    float stddev = xt::stddev(xt::view(src, 1, xt::all()))();
+    float stddev_after = (float(USHRT_MAX) * stddev_rate) / 3.f;
+
+    if (debug) {
+      std::cout << "stddev: " << stddev << std::endl;
+      debug_message << "stddev: " << stddev << "\n";
+      std::cout << "stddev_after: " << stddev_after << std::endl;
+      debug_message << "stddev_after: " << stddev_after << "\n";
+    }
+    std::vector<int> mapped(1 << 16, -1);
+    auto res = src;
+    auto it = res.begin();
+    while (it != res.end()) {
+      int v = *it;
+      if (mapped[v] < 0) {
+        float fv = v;
+        fv /= stddev;
+        fv *= stddev_after;
+        *it = std::clamp<int>(int(fv), 0, USHRT_MAX);
+        mapped[v] = *it;
+      } else {
+        *it = mapped[v];
+      }
+      it++;
+    }
+
+    if (debug) {
+      float stddev_actual = xt::stddev(res)();
+      std::cout << "stddev_actual: " << stddev_actual << std::endl;
+      debug_message << "stddev_actual: " << stddev_actual << "\n";
+    }
+
+    return res;
+  }
+
+  template <class E>
+  auto adjust_brightness_4(const xt::xexpression<E> &e,
+                           const float mean_rate = 0.5,
+                           const float stddev_rate = 0.96,
+                           const bool debug = false) noexcept {
+    auto &src = e.derived_cast();
+    int n = src.shape()[1];
+
+    float mean = xt::mean(xt::view(src, 1, xt::all()))();
+    float stddev = xt::stddev(xt::view(src, 1, xt::all()))();
+    float mean_after = float(USHRT_MAX) * mean_rate;
+    float stddev_after = (float(USHRT_MAX) * stddev_rate - mean_after) / 3.f;
+
+    if (debug) {
+      std::cout << "mean: " << mean << std::endl;
+      debug_message << "mean: " << mean << "\n";
+      std::cout << "stddev: " << stddev << std::endl;
+      debug_message << "stddev: " << stddev << "\n";
+      std::cout << "mean_after: " << mean_after << std::endl;
+      debug_message << "mean_after: " << mean_after << "\n";
+      std::cout << "stddev_after: " << stddev_after << std::endl;
+      debug_message << "stddev_after: " << stddev_after << "\n";
+    }
+    std::vector<int> mapped(1 << 16, -1);
+    auto res = src;
+    auto it = res.begin();
+    while (it != res.end()) {
+      int v = *it;
+      if (mapped[v] < 0) {
+        float fv = v;
+        fv = (fv - mean) / stddev;
+        fv = fv * stddev_after + mean_after;
+        *it = std::clamp<int>(int(fv), 0, USHRT_MAX);
+        mapped[v] = *it;
+      } else {
+        *it = mapped[v];
+      }
+      it++;
+    }
+
+    if (debug) {
+      float mean_actual = xt::mean(res)();
+      float stddev_actual = xt::stddev(res)();
+      std::cout << "mean after actual: " << mean_actual << std::endl;
+      debug_message << "mean after actual: " << mean_actual << "\n";
+      std::cout << "stddev_actual: " << stddev_actual << std::endl;
+      debug_message << "stddev_actual: " << stddev_actual << "\n";
+    }
+
+    return res;
+  }
+
+  template <class E>
+  auto adjust_brightness_3(const xt::xexpression<E> &e,
+                           const bool debug = false) noexcept {
+    auto &src = e.derived_cast();
+
+    std::vector<std::size_t> size = {1 << 16};
+    xt::xtensor<float, 1> histogram = xt::zeros<float>(size);
+    for (int i = 0; i < src.shape()[1]; i++) {
+      histogram(std::clamp<int>(src(1, i), 0, USHRT_MAX))++;
+    }
+
+    histogram =
+        xt::fma(histogram, float(USHRT_MAX) / float(src.shape()[1]), 0.);
+
+    for (int i = 1; i < 1 << 16; i++) {
+      histogram(i) += histogram(i - 1);
+    }
+
+    auto res = xt::empty_like(src);
+    for (int i = 0; i < src.shape()[1]; i++) {
+      res(0, i) = histogram(std::clamp<int>(src(0, i), 0, USHRT_MAX));
+      res(1, i) = histogram(std::clamp<int>(src(1, i), 0, USHRT_MAX));
+      res(2, i) = histogram(std::clamp<int>(src(2, i), 0, USHRT_MAX));
+    }
+
+    return res;
+  }
+
+  template <class E>
+  auto adjust_brightness_2(const xt::xexpression<E> &e,
+                           const float edge_acc_rate = 0.01,
+                           const float edge_val_rage = 0.001,
+                           const bool debug = false) noexcept {
+    if (debug) {
+      debug_message << "Start adjust_brightness_2()\n";
+    }
+    auto &src = e.derived_cast();
+    auto image = xt::clip(src, 0, USHRT_MAX);
+    auto res = xt::eval(image);
+
+    int acc_thresh = image.shape()[1] * edge_acc_rate;
+    if (debug) {
+      debug_message << "acc_thresh: " << acc_thresh << "\n";
+    }
+    std::vector<long long> histogram(1 << 13, 0);
+    for (int i = 0; i < image.shape()[1]; i++) {
+      histogram[static_cast<ushort>(image(1, i)) >> 3]++;
+    }
+
+    // calculate the minimum value in the scope.
+    ushort lower_bound = 0;
+    {
+      int bin = 0;
+      int acc = 0;
+      while (acc < acc_thresh && bin < histogram.size()) {
+        acc += histogram[bin];
+        bin++;
+      }
+      if (debug) {
+        debug_message << "min bin: " << bin << "\n";
+      }
+      lower_bound = (bin << 3);
+    }
+
+    // calculate the maximum value in the scope.
+    ushort upper_bound = USHRT_MAX;
+    {
+      int bin = histogram.size() - 1;
+      int acc = 0;
+      while (acc < acc_thresh && 0 < bin) {
+        acc += histogram[bin];
+        bin--;
+      }
+      if (debug) {
+        debug_message << "max bin: " << bin << "\n";
+      }
+      upper_bound = (bin << 3);
+    }
+
+    ushort mapped_lower_bound = USHRT_MAX * edge_val_rage;
+    ushort mapped_upper_bound = USHRT_MAX - mapped_lower_bound;
+
+    float lower_edge_slope = float(mapped_lower_bound) / float(lower_bound);
+    float upper_edge_slope =
+        float(USHRT_MAX - mapped_lower_bound) / float(USHRT_MAX - upper_bound);
+    float mid_slope = float(mapped_upper_bound - mapped_lower_bound) /
+                      float(upper_bound - lower_bound);
+    if (debug) {
+      debug_message << "lower bound: " << lower_bound << "\n";
+      debug_message << "mapped lower bound: " << mapped_lower_bound << "\n";
+      debug_message << "upper bound: " << upper_bound << "\n";
+      debug_message << "mapped bound: " << mapped_upper_bound << "\n";
+      debug_message << "lower edge slope: " << lower_edge_slope << "\n";
+      debug_message << "upper edge slope: " << upper_edge_slope << "\n";
+      debug_message << "mid slope: " << mid_slope << "\n";
+    }
+
+    std::vector<int> mapped(1 << 16, -1);
+    auto it = res.begin();
+    while (it != res.end()) {
+      if (mapped[*it] < 0) {
+        ushort val = std::clamp<int>(*it, 0., USHRT_MAX);
+        if (*it < lower_bound) {
+          *it = *it * lower_edge_slope;
+        } else if (upper_bound < *it) {
+          *it = (*it - upper_bound) * upper_edge_slope + mapped_upper_bound;
+        } else {
+          *it = (*it - lower_bound) * mid_slope + mapped_lower_bound;
+        }
+        mapped[val] = *it;
+      } else {
+        *it = mapped[*it];
+      }
+      it++;
+    }
+    return res;
+  }
+
   /**
    * @brief Emphasize the brightness and contrast (histogram stretching).
    * Clip the input data to [0, USHRT_MAX] and create a histogram with
@@ -199,6 +435,9 @@ public:
       debug_message << "Start adjust_brightness()\n";
     }
     auto &src = e.derived_cast();
+    if (strech_rate < 0.000001f) {
+      return src;
+    }
     auto &&image = xt::clip(src, 0, USHRT_MAX);
     float min_value = xt::amin(image)(), max_value = xt::amax(image)();
     if (0.999999f <= strech_rate) {
@@ -254,8 +493,7 @@ public:
       debug_message << "beta: " << std::to_string(beta) << "\n";
     }
     // calculate image * alpha + beta
-    auto &&res = xt::eval(image * alpha +
-                          beta); // xt::eval(xt::fma(image, alpha, beta));
+    auto &&res = xt::eval(xt::fma(image, alpha, beta));
     if (debug) {
       debug_message << "End adjust_brightness()\n";
     }

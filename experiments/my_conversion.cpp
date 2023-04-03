@@ -1,14 +1,13 @@
-#include <opencv2/opencv.hpp>
-#include <sstream>
-#include <string>
-#include <vector>
-// #include <netinet/in.h>
 #include "experiment_common.hpp"
 #include "raw_converter.hpp"
 #include <boost/log/trivial.hpp>
 #include <cxxopts.hpp>
 #include <iostream>
+#include <opencv2/opencv.hpp>
+#include <sstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 int main(int argc, char *argv[]) {
   try {
@@ -19,20 +18,20 @@ int main(int argc, char *argv[]) {
         "adjusts the brightness and contrasts, 3) applys gamma correction, and "
         "then 4) saves the result in PNG format. \n"
         "If you do not want to adjust brightness and contrast, do not specify "
-        "the -t option or specify -t 0.");
+        "-a option or specify -a 0.");
 
     options.add_options()("raw,r", "Save the raw image",
                           cxxopts::value<bool>())(
         "f,file", "ProRaw file path", cxxopts::value<std::string>())(
         "d,debug", "Enable debugging. Log file is output to ../logs/.",
         cxxopts::value<bool>())(
-        "t,thresh",
-        "Persentage of histogram stretching in the range [0, 1] (-t 0.1 "
+        "a,alpha",
+        "Persentage of histogram stretching in the range [0, 1] (-a 0.01 "
         "recommended). \nIf this "
         "option is not specified, the brightness and contrast will not be "
-        "adjusted. -t 0 means no brightness "
+        "adjusted. -a 0 means no brightness "
         "and "
-        "contrast adjustment, -t 1 "
+        "contrast adjustment, -a 1 "
         "means "
         "converting to a completely black image.",
         cxxopts::value<float>()->default_value("0."))(
@@ -52,10 +51,10 @@ int main(int argc, char *argv[]) {
     const bool is_debug = args["debug"].as<bool>();
     const bool save_raw = args["raw"].as<bool>();
     const bool measure_speed = args["measure"].as<bool>();
-    const float threshold = args["thresh"].as<float>();
+    const float alpha = args["alpha"].as<float>();
 
     yk::log_init(is_debug, "myconversion-");
-    BOOST_LOG_TRIVIAL(debug) << "Threshold: " << std::to_string(threshold);
+    BOOST_LOG_TRIVIAL(debug) << "Threshold: " << std::to_string(alpha);
 
     LibRaw raw;
 
@@ -108,6 +107,7 @@ int main(int argc, char *argv[]) {
     }
 
     yk::RawConverter rc{};
+    rc.raw_adjust(image);
 
     // Subtract Black Level
     // The black level is stored in DNG metadata.
@@ -161,12 +161,12 @@ int main(int argc, char *argv[]) {
       total_elapsed += elapsed;
 
       BOOST_LOG_TRIVIAL(trace) << "Adjusting the brightness and contrast.";
-      if (is_debug && threshold == 0.f) {
+      if (is_debug && alpha == 0.f) {
         BOOST_LOG_TRIVIAL(debug) << "adjust_brightness() is called, but "
                                     "the data is not stretched.";
       }
       start = std::chrono::system_clock::now();
-      auto &&srgb_adj = rc.adjust_brightness(srgb_, threshold, is_debug);
+      auto &&srgb_adj = rc.adjust_brightness(srgb_, alpha, is_debug);
       end = std::chrono::system_clock::now();
       elapsed =
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
@@ -219,10 +219,10 @@ int main(int argc, char *argv[]) {
         cv::Mat &&rgb_image = yk::ToCvMat3b(sRGB, raw.imgdata.sizes.iheight,
                                             raw.imgdata.sizes.iwidth);
         std::stringstream ss;
-        if (threshold == 0.f) {
+        if (alpha == 0.f) {
           ss << input_filename << ".cv_srgb_no_adj.png";
         } else {
-          ss << input_filename << ".cv_srgb_adj_" << std::to_string(threshold)
+          ss << input_filename << ".cv_srgb_adj_" << std::to_string(alpha)
              << ".png";
         }
         cv::imwrite(ss.str(), rgb_image);

@@ -22,23 +22,14 @@ int main(int argc, char *argv[]) {
         "correction, and "
         "then 4) saves the result in PNG format. \n"
         "If you do not want to adjust brightness and contrast, do not specify "
-        "the -t option or specify -t 0.");
+        "-a option or specify -a 0.");
 
     options.add_options()("raw,r", "Save the raw image",
                           cxxopts::value<bool>())(
         "f,file", "ProRaw file path", cxxopts::value<std::string>())(
         "d,debug", "Enable debugging. Log file is output to ../logs/.",
         cxxopts::value<bool>())(
-        "t,thresh",
-        "Persentage of histogram stretching in the range [0, 1] (-t 0.1 "
-        "recommended). \nIf this "
-        "option is not specified, the brightness and contrast will not be "
-        "adjusted. -t 0 means no brightness "
-        "and "
-        "contrast adjustment, -t 1 "
-        "means "
-        "converting to a completely black image.",
-        cxxopts::value<float>()->default_value("0."))(
+        "a,alpha", "", cxxopts::value<float>()->default_value("0.001"))(
         "m,measure", "Measure execution speed", cxxopts::value<bool>())(
         "c,color", "Apply color correction", cxxopts::value<bool>())(
         "g,gamma", "Apply gamma correction",
@@ -59,10 +50,9 @@ int main(int argc, char *argv[]) {
     const bool measure_speed = args["measure"].as<bool>();
     const bool apply_color_correction = args["color"].as<bool>();
     const bool apply_gamma_correction = args["gamma"].as<bool>();
-    const float threshold = args["thresh"].as<float>();
+    const float alpha = args["alpha"].as<float>();
 
     yk::log_init(is_debug, "effectcheck-");
-    BOOST_LOG_TRIVIAL(debug) << "Threshold: " << std::to_string(threshold);
 
     LibRaw raw;
 
@@ -101,6 +91,9 @@ int main(int argc, char *argv[]) {
       BOOST_LOG_TRIVIAL(debug) << ss.str();
     }
 
+    yk::RawConverter rc{};
+    rc.raw_adjust(image);
+
     if (save_raw) {
       BOOST_LOG_TRIVIAL(trace)
           << "Saving ProRaw values directly as a 8-bit PNG "
@@ -113,8 +106,6 @@ int main(int argc, char *argv[]) {
       cv::imwrite(ss.str(), cv_raw_image);
       BOOST_LOG_TRIVIAL(trace) << "Saved image: " << ss.str();
     }
-
-    yk::RawConverter rc{};
 
     // Subtract Black Level
     // The black level is stored in DNG metadata.
@@ -173,10 +164,10 @@ int main(int argc, char *argv[]) {
         result = xt::cast<ushort>(xt::clip(srgb_, 0, USHRT_MAX));
       }
 
-      if (is_debug && threshold != 0.f) {
+      if (0.000001 < alpha) {
         BOOST_LOG_TRIVIAL(trace) << "Adjusting the brightness and contrast.";
         auto start = std::chrono::system_clock::now();
-        auto &&srgb_adj = rc.adjust_brightness(result, threshold, is_debug);
+        auto &&srgb_adj = rc.adjust_brightness(result, alpha, is_debug);
         auto end = std::chrono::system_clock::now();
         double elapsed =
             std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
@@ -244,8 +235,8 @@ int main(int argc, char *argv[]) {
         if (apply_gamma_correction) {
           ss << "g_";
         }
-        if (threshold != 0) {
-          ss << "adj_" << std::to_string(threshold);
+        if (0.000001 < alpha) {
+          ss << "adj_" << std::to_string(alpha);
         } else {
           ss << "no_adj";
         }
