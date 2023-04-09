@@ -52,7 +52,7 @@ Done all conversion.
 ```
 
 ## Results
-|-t 0.00|-t 0.001|-t 0.005|-t 0.01|-t 0.05|
+|-a 0.00|-a 0.001|-a 0.005|-a 0.01|-a 0.05|
 |---|---|---|---|---|
 |![Result image (threshold=0.00)](data/IMG_0008.DNG.cv_srgb_no_adj.png)|![Result image (threshold=0.001)](data/IMG_0008.DNG.cv_srgb_adj_0.001000.png)|![Result image (threshold=0.005)](data/IMG_0008.DNG.cv_srgb_adj_0.005000.png)|![Result image (threshold=0.01)](data/IMG_0008.DNG.cv_srgb_adj_0.005000.png)|![Result image (threshold=0.05)](data/IMG_0008.DNG.cv_srgb_adj_0.050000.png)|
 
